@@ -27,7 +27,7 @@ def get_owner_with_most_wings(db: Session):
     return None
 
 def get_wings_by_owner_with_details(db: Session, owner_id: int):
-    """пПолучить экспонаты владельца с детальной информацией о владельце и типе"""
+    """пПолучить экспонаты вадельца с детальной информацией о владельце и типе"""
     return (db.query(models.Wing)
             .options(
                 joinedload(models.Wing.owner),
@@ -46,6 +46,9 @@ def update_wing(db: Session, wing_id: int, wing_update: schemas.WingCreate):
         db.commit()
         db.refresh(wing)
     return wing
+
+
+
 
 def create_move(db: Session, move: schemas.MoveCreate):
     """Создать новое перемещение"""
