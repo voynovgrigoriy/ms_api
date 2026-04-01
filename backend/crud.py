@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, case
 import models
 import schemas
 
@@ -27,7 +27,7 @@ def get_owner_with_most_wings(db: Session):
     return None
 
 def get_wings_by_owner_with_details(db: Session, owner_id: int):
-    """Получить экспонаты владельца с детальной информацией о владельце и типе"""
+    """пПолучить экспонаты владельца с детальной информацией о владельце и типе"""
     return (db.query(models.Wing)
             .options(
                 joinedload(models.Wing.owner),
@@ -192,3 +192,81 @@ def get_owners_with_specific_lastname(db: Session):
         for r in result
     ]
 
+
+
+# ==================== НОВЫЕ ФУНКЦИИ ДЛЯ ЗАПРОСОВ ИЗ СКРИНШОТОВ ====================
+
+def get_places_spb(db: Session):
+    """
+    Возвращает все места выставок, расположенные в Санкт-Петербурге.
+    Аналог запроса: SELECT * FROM places WHERE location = 'Санкт-Петербург' OR location = 'СПб';
+    """
+    return (db.query(models.Place)
+            .filter(
+                (models.Place.location == 'Санкт-Петербург') | 
+                (models.Place.location == 'СПб')
+            )
+            .all())
+
+def get_places_spb_above_avg_scale(db: Session):
+    """
+    Возвращает места в Санкт-Петербурге с масштабом выше среднего.
+    Аналог запроса:
+        SELECT * FROM places
+        WHERE (location = 'Санкт-Петербург' OR location = 'СПб')
+          AND scale > (SELECT AVG(scale) FROM places);
+    """
+    # Подзапрос для среднего масштаба
+    avg_scale = db.query(func.avg(models.Place.scale)).scalar_subquery()
+    return (db.query(models.Place)
+            .filter(
+                ((models.Place.location == 'Санкт-Петербург') | 
+                 (models.Place.location == 'СПб')) &
+                (models.Place.scale > avg_scale)
+            )
+            .all())
+
+def get_email_service_stats(db: Session):
+    """
+    Статистика по почтовым сервисам владельцев.
+    Аналог запроса:
+        SELECT
+            CASE
+                WHEN email LIKE '%@example.com' OR email LIKE '%@example.net' OR email LIKE '%@example.org'
+                THEN 'Example Group' ELSE 'Other'
+            END AS email_service,
+            COUNT(*) AS client_count,
+            ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM owners), 2) AS share_percent
+        FROM owners
+        GROUP BY email_service
+        ORDER BY client_count DESC;
+    """
+    total_owners = db.query(func.count(models.Owner.id)).scalar()
+    
+    # Определяем условие CASE
+    email_case = case(
+        (models.Owner.email.like('%@example.com'), 'Example Group'),
+        (models.Owner.email.like('%@example.net'), 'Example Group'),
+        (models.Owner.email.like('%@example.org'), 'Example Group'),
+        else_='Other'
+    ).label('email_service')
+    
+    # Выполняем группировку
+    results = (db.query(
+            email_case,
+            func.count(models.Owner.id).label('client_count'),
+            (func.count(models.Owner.id) * 100.0 / total_owners).label('share_percent')
+        )
+        .group_by('email_service')
+        .order_by(desc('client_count'))
+        .all())
+    
+    # Формируем список словарей с округлением доли
+    return [
+        {
+            "email_service": r[0],
+            "client_count": r[1],
+            "share_percent": round(r[2], 2)
+        }
+        for r in results
+    ]

@@ -210,3 +210,37 @@ def get_owners_with_specific_lastname(db: Session = Depends(get_db)):
     if result is None:
         raise HTTPException(status_code=404, detail="Таких фамилий нет")
     return create_response_with_sql(result)
+
+
+
+# ==================== НОВЫЕ АНАЛИТИЧЕСКИЕ ЗАПРОСЫ ====================
+
+@router.get("/analytics/places-spb", tags=["📊 Аналитика"])
+def get_places_spb(db: Session = Depends(get_db)):
+    """
+    Получить все места выставок в Санкт-Петербурге.
+    Аналог запроса: SELECT * FROM places WHERE location = 'Санкт-Петербург' OR location = 'СПб';
+    """
+    places = crud.get_places_spb(db)
+    return create_response_with_sql(places)
+
+@router.get("/analytics/places-spb-above-avg", tags=["📊 Аналитика"])
+def get_places_spb_above_avg_scale(db: Session = Depends(get_db)):
+    """
+    Получить места в Санкт-Петербурге с масштабом выше среднего.
+    Аналог запроса:
+        SELECT * FROM places
+        WHERE (location = 'Санкт-Петербург' OR location = 'СПб')
+          AND scale > (SELECT AVG(scale) FROM places);
+    """
+    places = crud.get_places_spb_above_avg_scale(db)
+    return create_response_with_sql(places)
+
+@router.get("/analytics/email-service-stats", tags=["📊 Аналитика"])
+def get_email_service_stats(db: Session = Depends(get_db)):
+    """
+    Статистика распределения владельцев по почтовым сервисам.
+    Аналог запроса с CASE и группировкой.
+    """
+    stats = crud.get_email_service_stats(db)
+    return create_response_with_sql(stats)
